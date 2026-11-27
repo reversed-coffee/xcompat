@@ -35,10 +35,12 @@ int main(const int argc, char* argv[]) {
     auto& title = guest.load_image(title_path);
     xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.image.base.i, title.image.size);
 
-    hy::err error;
-    for (auto import : title.image.imports(&error)) {
-        std::cout << "import: " << import.name.value_or("ordinal") << " from " << import.module << "\n";
+    if (!guest.resolve_imports(title)) {
+        xcompat::log::fatal("Failed to resolve title imports");
+        return 1;
     }
+
+    xcompat::log::info("Resolved {} modules", guest.module_count());
 
     std::cin.get();
     return 0;
