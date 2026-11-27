@@ -3,7 +3,6 @@
 #include <hydra/procstm.hpp>
 
 #include <algorithm>
-#include <array>
 #include <charconv>
 #include <cstddef>
 #include <cctype>
@@ -14,6 +13,58 @@
 #include "xcompat/log.hpp"
 
 namespace {
+    [[nodiscard]] bool is_api_set(const std::string_view name) {
+        return name.starts_with("api-") || name.starts_with("ext-");
+    }
+
+    [[nodiscard]] std::optional<std::wstring> widen_ascii(const std::string_view value) {
+        std::wstring result;
+        result.reserve(value.size());
+
+        for (const unsigned char character : value) {
+            if (character > 0x7F)
+                return std::nullopt;
+
+            result.push_back(character);
+        }
+
+        return result;
+    }
+
+    [[nodiscard]] std::optional<std::filesystem::path> module_path(const HMODULE module) {
+        std::wstring path(512, L'\0');
+
+        for (;;) {
+            const auto length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
+            if (!length)
+                return std::nullopt;
+
+            if (length < path.size()) {
+                path.resize(length);
+                return std::filesystem::path(std::move(path));
+            }
+
+            if (path.size() >= 32768)
+                return std::nullopt;
+
+            path.resize(path.size() * 2);
+        }
+    }
+
+    class library_guard {
+        HMODULE handle;
+
+    public:
+        explicit library_guard(const HMODULE handle) : handle(handle) {}
+
+        ~library_guard() {
+            FreeLibrary(handle);
+        }
+
+        library_guard(const library_guard&) = delete;
+        library_guard& operator=(const library_guard&) = delete;
+    };
+
     class writable_segments {
         hy::proc& process;
         std::span<const hy::seg> segments;
@@ -73,78 +124,21 @@ namespace xcompat {
         return normalized;
     }
 
-    std::optional<std::string> guest::resolve_api_set(const std::string_view name) {
-        auto contract = normalize_module_name(name);
-        if (!contract.starts_with("api-") && !contract.starts_with("ext-"))
+    std::optional<std::filesystem::path> guest::resolve_system_image(const std::string_view name) {
+        const auto wide_name = widen_ascii(name);
+        if (!wide_name)
             return std::nullopt;
 
-        contract.resize(contract.size() - std::string_view(".dll").size());
-
-        const auto* schema = static_cast<const API_SET_NAMESPACE*>(NtCurrentPeb()->ApiSetMap);
-        if (!schema || schema->Version != API_SET_SCHEMA_VERSION_V6 || schema->Size < sizeof(*schema))
+        const auto handle = LoadLibraryExW(
+            wide_name->c_str(),
+            nullptr,
+            LOAD_LIBRARY_SEARCH_SYSTEM32 | DONT_RESOLVE_DLL_REFERENCES
+        );
+        if (!handle)
             return std::nullopt;
 
-        const auto* base = reinterpret_cast<const std::byte*>(schema);
-        const auto valid = [schema](const std::size_t offset, const std::size_t size) {
-            return offset <= schema->Size && size <= schema->Size - offset;
-        };
-
-        if (!valid(schema->EntryOffset, static_cast<std::size_t>(schema->Count) * sizeof(API_SET_NAMESPACE_ENTRY)))
-            return std::nullopt;
-
-        const auto* entries = reinterpret_cast<const API_SET_NAMESPACE_ENTRY*>(base + schema->EntryOffset);
-        for (ULONG entry_index = 0; entry_index < schema->Count; ++entry_index) {
-            const auto& entry = entries[entry_index];
-            if (entry.NameLength != contract.size() * sizeof(wchar_t) ||
-                !valid(entry.NameOffset, entry.NameLength)) {
-                continue;
-            }
-
-            const auto* entry_name = reinterpret_cast<const wchar_t*>(base + entry.NameOffset);
-            bool matches = true;
-
-            for (std::size_t index = 0; index < contract.size(); ++index) {
-                if (entry_name[index] != static_cast<unsigned char>(contract[index])) {
-                    matches = false;
-                    break;
-                }
-            }
-
-            if (!matches || !entry.ValueCount ||
-                !valid(entry.ValueOffset, static_cast<std::size_t>(entry.ValueCount) * sizeof(API_SET_VALUE_ENTRY))) {
-                continue;
-            }
-
-            const auto* values = reinterpret_cast<const API_SET_VALUE_ENTRY*>(base + entry.ValueOffset);
-            const API_SET_VALUE_ENTRY* selected = &values[0];
-
-            for (ULONG value_index = 0; value_index < entry.ValueCount; ++value_index) {
-                if (!values[value_index].NameLength) {
-                    selected = &values[value_index];
-                    break;
-                }
-            }
-
-            if (!selected->ValueLength || selected->ValueLength % sizeof(wchar_t) ||
-                !valid(selected->ValueOffset, selected->ValueLength)) {
-                return std::nullopt;
-            }
-
-            const auto* value = reinterpret_cast<const wchar_t*>(base + selected->ValueOffset);
-            std::string host;
-            host.reserve(selected->ValueLength / sizeof(wchar_t));
-
-            for (std::size_t index = 0; index < selected->ValueLength / sizeof(wchar_t); ++index) {
-                if (value[index] > 0x7F)
-                    return std::nullopt;
-
-                host.push_back(static_cast<char>(value[index]));
-            }
-
-            return host;
-        }
-
-        return std::nullopt;
+        const library_guard guard(handle);
+        return module_path(handle);
     }
 
     hy::proc guest::create_process() {
@@ -190,30 +184,13 @@ namespace xcompat {
         if (title_path != local_path && std::filesystem::is_regular_file(title_path, error))
             return title_path;
 
-        std::array<wchar_t, MAX_PATH> system_directory{};
-        const auto length = GetSystemDirectoryW(system_directory.data(), system_directory.size());
-        if (!length || length >= system_directory.size())
-            return std::nullopt;
-
-        error.clear();
-        const auto system_path = std::filesystem::path(system_directory.data()) / filename;
-        if (std::filesystem::is_regular_file(system_path, error))
-            return system_path;
-
-        return std::nullopt;
+        return resolve_system_image(name);
     }
 
     module* guest::load_dependency(module& importer, const std::string_view name) {
         auto module_name = normalize_module_name(name);
         if (auto* loaded = find_module(module_name))
             return loaded;
-
-        if (const auto host = resolve_api_set(module_name)) {
-            module_name = normalize_module_name(*host);
-
-            if (auto* loaded = find_module(module_name))
-                return loaded;
-        }
 
         if (unavailable_modules.contains(module_name))
             return nullptr;
@@ -336,6 +313,76 @@ namespace xcompat {
         return pair->second;
     }
 
+    std::optional<hy::ptr> guest::resolve_system_export(
+        module& source,
+        const std::string_view module_name,
+        const std::optional<std::string>& name,
+        const std::optional<std::uint32_t>& ordinal,
+        bool& dependencies_resolved
+    ) {
+        const auto wide_name = widen_ascii(module_name);
+        if (!wide_name)
+            return std::nullopt;
+
+        const auto handle = LoadLibraryExW(wide_name->c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!handle) {
+            if (unavailable_modules.emplace(normalize_module_name(module_name)).second)
+                log::error("No module '{}' required by '{}'", module_name, source.image.name);
+
+            return std::nullopt;
+        }
+
+        const library_guard guard(handle);
+        FARPROC procedure = nullptr;
+
+        if (name) {
+            procedure = GetProcAddress(handle, name->c_str());
+        }
+        else if (ordinal && *ordinal <= UINT16_MAX) {
+            procedure = GetProcAddress(handle, MAKEINTRESOURCEA(*ordinal));
+        }
+
+        if (!procedure)
+            return std::nullopt;
+
+        HMODULE implementation;
+        if (!GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(procedure),
+            &implementation
+        )) {
+            return std::nullopt;
+        }
+
+        const auto path = module_path(implementation);
+        if (!path)
+            return std::nullopt;
+
+        module* target;
+
+        try {
+            target = &load_image(*path);
+        }
+        catch (const std::exception& error) {
+            log::error("Failed to load module '{}' required by '{}': {}", path->string(), source.image.name, error.what());
+            return std::nullopt;
+        }
+
+        if (!resolve_imports(*target))
+            dependencies_resolved = false;
+
+        const auto implementation_base = reinterpret_cast<std::uintptr_t>(implementation);
+        const auto procedure_address = reinterpret_cast<std::uintptr_t>(procedure);
+        if (procedure_address < implementation_base)
+            return std::nullopt;
+
+        const auto rva = procedure_address - implementation_base;
+        if (rva >= target->mapping.block.size)
+            return std::nullopt;
+
+        return target->image.base + rva;
+    }
+
     std::optional<hy::ptr> guest::resolve_export(
         module& source,
         const std::optional<std::string>& name,
@@ -376,6 +423,35 @@ namespace xcompat {
 
         const std::string_view forward_module(symbol->forwarder->data(), separator);
         const std::string_view forward_symbol(symbol->forwarder->data() + separator + 1);
+        std::optional<std::string> forward_name;
+        std::optional<std::uint32_t> forward_ordinal;
+
+        if (forward_symbol.front() != '#') {
+            forward_name = forward_symbol;
+        }
+        else {
+            std::uint32_t value;
+            const auto [end, error] = std::from_chars(
+                forward_symbol.data() + 1,
+                forward_symbol.data() + forward_symbol.size(),
+                value
+            );
+            if (error != std::errc{} || end != forward_symbol.data() + forward_symbol.size())
+                return std::nullopt;
+
+            forward_ordinal = value;
+        }
+
+        if (is_api_set(forward_module)) {
+            return resolve_system_export(
+                source,
+                forward_module,
+                forward_name,
+                forward_ordinal,
+                dependencies_resolved
+            );
+        }
+
         auto* target = load_dependency(source, forward_module);
         if (!target)
             return std::nullopt;
@@ -383,25 +459,7 @@ namespace xcompat {
         if (!resolve_imports(*target))
             dependencies_resolved = false;
 
-        if (forward_symbol.front() != '#')
-            return resolve_export(
-                *target,
-                std::optional<std::string>(forward_symbol),
-                std::nullopt,
-                dependencies_resolved,
-                chain
-            );
-
-        std::uint32_t forward_ordinal;
-        const auto [end, error] = std::from_chars(
-            forward_symbol.data() + 1,
-            forward_symbol.data() + forward_symbol.size(),
-            forward_ordinal
-        );
-        if (error != std::errc{} || end != forward_symbol.data() + forward_symbol.size())
-            return std::nullopt;
-
-        return resolve_export(*target, std::nullopt, forward_ordinal, dependencies_resolved, chain);
+        return resolve_export(*target, forward_name, forward_ordinal, dependencies_resolved, chain);
     }
 
     bool guest::resolve_imports(module& loaded) {
@@ -423,20 +481,33 @@ namespace xcompat {
         }
 
         for (const auto& imported : loaded.image.imports(&error)) {
-            auto* dependency = load_dependency(loaded, imported.module);
-            if (!dependency) {
-                success = false;
-                continue;
-            }
-
-            if (!resolve_imports(*dependency))
-                success = false;
-
-            std::unordered_set<std::string> chain;
             const auto ordinal = imported.ordinal
                 ? std::optional<std::uint32_t>(*imported.ordinal)
                 : std::nullopt;
-            const auto address = resolve_export(*dependency, imported.name, ordinal, success, chain);
+            std::optional<hy::ptr> address;
+
+            if (is_api_set(imported.module)) {
+                address = resolve_system_export(loaded, imported.module, imported.name, ordinal, success);
+
+                if (!address && unavailable_modules.contains(normalize_module_name(imported.module))) {
+                    success = false;
+                    continue;
+                }
+            }
+            else {
+                auto* dependency = load_dependency(loaded, imported.module);
+                if (!dependency) {
+                    success = false;
+                    continue;
+                }
+
+                if (!resolve_imports(*dependency))
+                    success = false;
+
+                std::unordered_set<std::string> chain;
+                address = resolve_export(*dependency, imported.name, ordinal, success, chain);
+            }
+
             if (!address) {
                 if (imported.name) {
                     log::error(

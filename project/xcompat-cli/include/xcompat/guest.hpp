@@ -43,7 +43,7 @@ namespace xcompat {
     class guest {
         static hy::proc create_process();
         static std::string normalize_module_name(std::string_view name);
-        static std::optional<std::string> resolve_api_set(std::string_view name);
+        static std::optional<std::filesystem::path> resolve_system_image(std::string_view name);
 
         std::filesystem::path title_directory;
         std::unordered_map<std::string, module> modules;
@@ -56,6 +56,13 @@ namespace xcompat {
         ) const;
 
         [[nodiscard]] module* load_dependency(module& importer, std::string_view name);
+        [[nodiscard]] std::optional<hy::ptr> resolve_system_export(
+            module& source,
+            std::string_view module_name,
+            const std::optional<std::string>& name,
+            const std::optional<std::uint32_t>& ordinal,
+            bool& dependencies_resolved
+        );
         [[nodiscard]] std::optional<hy::ptr> resolve_export(
             module& source,
             const std::optional<std::string>& name,
