@@ -44,12 +44,29 @@ operating system, runtime, and hardware interface levels.
 
 ## Development
 
-xcompat is written in modern C++ and builds upon hydra for low-level systems programming,
-memory management, and PE manipulation.
+xcompat is written in modern C++ and builds upon [Hydra](https://github.com/substrant/hydra/tree/reversed-coffee/v2),
+a C++23 process manipulation library that I have used in other projects, for low-level systems programming, memory
+management, and PE manipulation.
 
 This project is a loader proof of concept. The native loading path is in place through
 dependency and import resolution; guest execution and the Scarlett memory, graphics,
 storage, and audio services remain unimplemented.
+
+| Component | Status |
+|---|---|
+| Native NT process creation | Implemented |
+| PE32+ image mapping | Implemented |
+| Remote process memory access | Implemented |
+| Base relocation processing | Implemented |
+| Import enumeration | Implemented |
+| Dependency loading | Prototype |
+| Import resolution | Partial |
+| Scarlett runtime | Research |
+| Guest execution | Not yet implemented |
+| Graphics compatibility | Not yet implemented |
+
+The loader currently prepares the title image and available dependencies inside a dedicated guest process. Unresolved
+Scarlett-specific imports are collected to identify the runtime interfaces requiring implementation.
 
 ## Disclaimer
 
