@@ -21,7 +21,7 @@ static void spawn_guest(const std::filesystem::path& canon_path, std::vector<std
     xcompat::log::info("Guest PID: 0x{:X}", GetProcessId(guest.proc));
 
     // load portable executable in process
-    auto title = guest.load_image(canon_path);
+    auto& title = guest.load_image(canon_path);
     xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.base.i, title.size);
 
     // resolve system imports

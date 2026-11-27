@@ -8,6 +8,8 @@
 #include <span>
 #include <stdexcept>
 
+#include "xcompat/loader.hpp"
+
 namespace xcompat {
     hy::proc guest::create_process() {
         hy::proc proc;
@@ -24,42 +26,24 @@ namespace xcompat {
         return proc;
     }
 
-    hy::mod guest::load_image(const std::filesystem::path& image_path) {
-        const auto full_path = std::filesystem::canonical(image_path);
-        const auto image_name = full_path.filename().string();
+    hy::mod& guest::load_image(const std::filesystem::path& image_path) {
+        const auto image_name = image_path.filename().string();
+        if (modules.contains(image_name))
+            throw std::runtime_error("image already loaded");
 
-        hy::nt::hnd block_handle;
-        hy::blk img_block{ nullptr, 0 };
+        auto image_module = loader::map_img_file_to_proc(proc, image_path);
+        log::debug("Load image: \"{}\" -> {:X} (size: {:X})", image_name, image_module.base.i, image_module.size);
 
-        const hy::nt::hnd file(CreateFileW(
-            full_path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL, nullptr
-        ));
-
-        if (file == INVALID_HANDLE_VALUE)
-            throw hy::nt::win32_error("failed to open image file");
-
-        hy::nt::error::assert(NtCreateSection(
-            &block_handle, SECTION_ALL_ACCESS, nullptr, nullptr, PAGE_READONLY, SEC_IMAGE,
-            file
-        ), "failed to create image section");
-
-        hy::nt::error::assert(NtMapViewOfSection(
-            block_handle, proc, &img_block.base.u, 0, 0, nullptr, &img_block.size, ViewUnmap,
-            0, PAGE_READONLY
-        ), "failed to map image in guest process");
-
-        log::debug("Load image: \"{}\" -> {:X} (size: {:X})", image_name, img_block.base.i, img_block.size);
-
-        hy::procstm img_stm(proc, img_block);
-        hy::img image(std::move(img_stm), hy::img_state::mapped);
-
-        if (image.parse() != hy::STA_SUCCESS)
+        if (image_module.parse() != hy::STA_SUCCESS)
             throw std::runtime_error("failed to parse pe");
 
-        if (image.reloc(img_block.base) != hy::STA_SUCCESS)
+        if (image_module.reloc(image_module.base) != hy::STA_SUCCESS)
             throw std::runtime_error("relocation failed");
 
-        return hy::mod(image_name, std::move(image));
+        auto [pair, success] = modules.emplace(image_name, std::move(image_module));
+        if (!success)
+            throw std::runtime_error("failed to register image");
+
+        return pair->second;
     }
 }
