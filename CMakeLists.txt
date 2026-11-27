@@ -12,5 +12,6 @@ endif()
 
 add_subdirectory(dependencies/hydra)
 
+add_subdirectory(project/xcompat)
 add_subdirectory(project/xcompat-cli)
 add_subdirectory(project/xcompat-tgt)

@@ -2,8 +2,13 @@
 
 An experimental Xbox Series X|S (Scarlett) compatibility layer for Windows.
 
-xcompat aims to enable native execution of Scarlett binaries on Windows by providing a
-compatible runtime environment and reimplementing Xbox-specific system interfaces.
+The initial prototype already supports guest process creation, PE mapping, relocations,
+and import enumeration.
+
+The long-term objective is to reproduce the Scarlett execution environment while
+leveraging native Windows and hardware capabilities wherever possible.
+
+Early research prototype. Game execution is not implemented yet.
 
 ## Current state
 
