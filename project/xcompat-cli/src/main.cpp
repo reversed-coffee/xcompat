@@ -21,16 +21,16 @@ static void spawn_guest(const std::filesystem::path& canon_path, std::vector<std
     xcompat::log::info("Guest PID: 0x{:X}", GetProcessId(guest.proc));
 
     // load portable executable in process
-    auto& title = guest.load_image(canon_path);
-    xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.image.base.i, title.image.size);
+    auto title = guest.load_image(canon_path);
+    xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.base.i, title.size);
 
     // resolve system imports
-    if (!guest.resolve_imports(title)) {
+    /*if (!guest.resolve_imports(title)) {
         xcompat::log::fatal("Failed to resolve title imports");
         return;
     }
 
-    xcompat::log::info("Resolved {} modules", guest.module_count());
+    xcompat::log::info("Resolved {} modules", guest.module_count());*/
 }
 
 int main(const int argc, char* argv[]) {
