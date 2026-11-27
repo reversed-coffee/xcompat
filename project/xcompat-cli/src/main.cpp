@@ -15,22 +15,33 @@ static void init() {
     xcompat::log::init();
 }
 
-static void spawn_guest(const std::filesystem::path& canon_path, std::vector<std::string> args) {
+static int spawn_guest(const std::filesystem::path& canon_path, std::vector<std::string> args) {
     // initialize guest process
     xcompat::guest guest{};
     xcompat::log::info("Guest PID: 0x{:X}", GetProcessId(guest.proc));
 
     // load portable executable in process
-    auto& title = guest.load_image(canon_path);
+    xcompat::load_ctx title_load;
+
+    auto& title = guest.load_image(canon_path, &title_load);
     xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.base.i, title.size);
 
-    // resolve system imports
-    /*if (!guest.resolve_imports(title)) {
-        xcompat::log::fatal("Failed to resolve title imports");
-        return;
+    if (title_load.incomplete) {
+        xcompat::log::error("Unable to resolve {} imports", title_load.missing_modules.size());
+
+        std::stringstream list_stm{};
+        for (auto& import : title_load.missing_modules)
+            list_stm << import << ", ";
+
+        auto list_str = list_stm.str();
+        if (list_str.length() >= 2)
+            list_str.erase(list_str.length() - 2);
+
+        xcompat::log::warn("Missing modules: {}", list_str);
+        return 1;
     }
 
-    xcompat::log::info("Resolved {} modules", guest.module_count());*/
+    return 0;
 }
 
 int main(const int argc, char* argv[]) {
@@ -41,7 +52,7 @@ int main(const int argc, char* argv[]) {
     
     // extract arguments
     const auto title_path_rel = argv[1];
-    std::vector<std::string> args(argv + 2, argv + argc);
+    const std::vector<std::string> args(argv + 2, argv + argc);
 
     // verify executable path
     if (!std::filesystem::exists(title_path_rel)) {
@@ -54,8 +65,8 @@ int main(const int argc, char* argv[]) {
     xcompat::log::debug("Title path: {}", title_path.string());
 
     // start compatibility layer w/ proc
-    spawn_guest(title_path, args);
+    const auto status = spawn_guest(title_path, args);
 
     std::cin.get();
-    return 0;
+    return status;
 }

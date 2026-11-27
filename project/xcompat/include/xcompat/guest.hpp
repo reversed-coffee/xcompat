@@ -4,8 +4,14 @@
 #include <hydra/img.hpp> // NOLINT
 
 #include <filesystem>
+#include <unordered_set>
 
 namespace xcompat {
+    struct load_ctx {
+        bool incomplete;
+        std::unordered_set<std::string> missing_modules;
+    };
+
     class guest {
         static hy::proc create_process();
 
@@ -15,6 +21,6 @@ namespace xcompat {
 
         explicit guest() : proc(std::move(create_process())) {}
 
-        hy::mod& load_image(const std::filesystem::path& image_path);
+        hy::mod& load_image(const std::filesystem::path& image_path, load_ctx* ctx);
     };
 }
