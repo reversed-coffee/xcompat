@@ -151,6 +151,8 @@ namespace {
     }
 
     std::jthread digest_thread;
+
+    std::atomic minimum_level{ xcompat::log::level::trace };
 }
 
 namespace xcompat::log {
@@ -187,11 +189,21 @@ namespace xcompat::log {
         digest_all();
     }
 
-    void write(level level, std::string message) {
+    void set_level(const level level) {
+        minimum_level.store(level, std::memory_order_relaxed);
+    }
+
+    level get_level() {
+        return minimum_level.load(std::memory_order_relaxed);
+    }
+
+    void write(const level level, std::string message) {
+        if (level < get_level())
+            return;
+
         auto& digest = *local_digest.digest;
 
         digest.acquire();
-
         try {
             digest.requests.push({ level, std::move(message) });
         }
@@ -199,7 +211,6 @@ namespace xcompat::log {
             digest.release();
             throw;
         }
-
         digest.release();
     }
 }

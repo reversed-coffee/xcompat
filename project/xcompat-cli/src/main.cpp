@@ -13,6 +13,7 @@ static int usage() {
 static void init() {
     SetConsoleTitleA("xcompat");
     xcompat::log::init();
+    xcompat::log::set_level(xcompat::log::level::debug);
 }
 
 static int spawn_guest(const std::filesystem::path& canon_path, std::vector<std::string> args) {

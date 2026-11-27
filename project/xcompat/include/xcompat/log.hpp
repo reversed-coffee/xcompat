@@ -24,10 +24,14 @@ namespace xcompat::log {
     void shutdown();
     void flush();
 
+    void set_level(level level);
+    level get_level();
+
     void write(level level, std::string message);
 
     template <typename... Args>
-    void write(level level, std::format_string<Args...> format, Args&&... args) {
+    void write(const level level, std::format_string<Args...> format, Args&&... args) {
+        if (level < get_level()) return;
         write(level, std::format(format, std::forward<Args>(args)...));
     }
 
