@@ -7,12 +7,14 @@ compatible runtime environment and reimplementing Xbox-specific system interface
 
 ## Current state
 
-The project is in the early stages of research and prototyping.
+The project is an early loader prototype. It can construct a guest process and prepare a
+Scarlett title image, but it does not start the title's initial thread yet.
 
-Currently implemented:
-
-- Native NT guest process creation
-- PE image mapping using native NT image sections
+The loader currently maps the title and its available Windows and packaged dependencies,
+then stops when required Scarlett system modules are unavailable. The remaining known
+surface is Scarlett-specific imports across several DLLs. Their researched signatures,
+behavior, and implementation requirements are tracked in the
+[first-glance implementation checklist](./docs/notes/01-first-glance.md).
 
 ## Architecture
 
@@ -21,15 +23,15 @@ compatible with Windows. This allows xcompat to load the binary in memory space 
 to how Windows loads an executable.
 
 xcompat starts by creating a guest process in Windows and maps the Scarlett executable
-into its memory space. The host process is responsible for managing the guest process, loading modules, applying relocations, and resolving imported symbols.
+into its memory space. The host process is responsible for managing the guest process,
+loading modules, applying relocations, and resolving imported symbols.
 
 
 ![Loader Architecture](./docs/assets/xcompat-loader.drawio.svg)
 
-Where possible, imported symbols are resolved directly to native Windows APIs. Unresolved
-or incompatible interfaces are instead routed through the xcompat runtime, which provides
-implementations of Scarlett-specific APIs and translates platform-specific behavior into
-equivalent Windows functionality.
+Where possible, imported symbols are resolved directly to native Windows APIs. The planned
+xcompat runtime will provide incompatible or Scarlett-specific interfaces and translate
+their platform behavior into equivalent Windows functionality.
 
 Since Scarlett is targeted to run on an x86-64 processor, guest code can execute natively
 without CPU emulation. This allows xcompat to focus primarily on compatibility at the
@@ -40,8 +42,9 @@ operating system, runtime, and hardware interface levels.
 xcompat is written in modern C++ and builds upon hydra for low-level systems programming,
 memory management, and PE manipulation.
 
-This project is currently a proof of concept and is nowhere near capable of running
-titles.
+This project is a loader proof of concept. The native loading path is in place through
+dependency and import resolution; guest execution and the Scarlett memory, graphics,
+storage, and audio services remain unimplemented.
 
 ## Disclaimer
 
