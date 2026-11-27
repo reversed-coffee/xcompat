@@ -1,0 +1,7 @@
+[submodule "dependencies/phnt"]
+	path = dependencies/phnt
+	url = https://github.com/winsiderss/phnt.git
+[submodule "dependencies/hydra"]
+	path = dependencies/hydra
+	url = https://github.com/substrant/hydra.git
+	branch = reversed-coffee/v2
