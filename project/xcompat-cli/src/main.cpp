@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <string>
 
+#include "xcompat/log.hpp"
 #include "xcompat/guest.hpp"
 
 int usage() {
@@ -11,7 +12,10 @@ int usage() {
 
 int main(const int argc, char* argv[]) {
     SetConsoleTitleA("xcompat");
-    if (argc != 2) return usage();
+    xcompat::log::init();
+
+    if (argc != 2)
+        return usage();
 
     // verify executable path
     if (!std::filesystem::exists(argv[1])) {
@@ -20,19 +24,22 @@ int main(const int argc, char* argv[]) {
     }
 
     // get canonical path
-    const auto exe_path = std::filesystem::canonical(argv[1]);
+    const auto title_path = std::filesystem::canonical(argv[1]);
+    xcompat::log::debug("Title path: {}", title_path.string());
 
     // start guest process
     xcompat::guest guest{};
-    std::cout << "Guest PID: " << GetProcessId(guest.proc) << "\n";
+    xcompat::log::info("Guest PID: 0x{:X}", GetProcessId(guest.proc));
 
     // load title image
-    auto& title_module = guest.load_image(exe_path);
+    auto& title = guest.load_image(title_path);
+    xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.image.base.i, title.image.size);
 
-    std::cout << "Module:    0x" << std::hex << title_module.image.base.u << " (size: 0x" << title_module.image.size << ")\n";
+    hy::err error;
+    for (auto import : title.image.imports(&error)) {
+        std::cout << "import: " << import.name.value_or("ordinal") << " from " << import.module << "\n";
+    }
 
-    std::cout << "Press enter to close.";
     std::cin.get();
-
     return 0;
 }

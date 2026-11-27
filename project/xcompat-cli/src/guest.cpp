@@ -4,6 +4,8 @@
 
 #include <iostream>
 
+#include "xcompat/log.hpp"
+
 namespace xcompat {
     hy::proc guest::create_process() {
         HANDLE handle;
@@ -58,12 +60,12 @@ namespace xcompat {
             "failed to map image in guest process"
         );
 
+        log::debug("Image base: {:X} (size: {:X})", sect_blk.base.i, sect_blk.size);
         section section{ std::move(sect), sect_blk };
-        std::cout << "Mapped PE: " << section.block.base.u << "\n";
 
         // load extern pe
         hy::procstm image_stm(proc, section.block);
-        hy::mod image(image_name, image_stm, hy::mod_state::mapped);
+        hy::mod image(image_name, std::move(image_stm), hy::mod_state::mapped);
 
         // parse pe
         if (image.parse() != hy::STA_SUCCESS)
@@ -72,11 +74,6 @@ namespace xcompat {
         // relocate image
         if (image.reloc(section.block.base) != hy::STA_SUCCESS)
             throw std::runtime_error("relocation failed");
-
-        hy::err error;
-        for (auto import : image.imports(&error)) {
-            std::cout << "import: " << import.name.value_or("ordinal") << " from " << import.module << "\n";
-        }
 
         // add to registry
         const auto [pair, success] = modules.emplace(image_name, module{ std::move(section), std::move(image) });
