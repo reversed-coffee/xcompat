@@ -27,7 +27,11 @@ namespace xcompat {
         return proc;
     }
 
-    section guest::load_image(const std::filesystem::path& image_path) {
+    module& guest::load_image(const std::filesystem::path& image_path) {
+        auto image_name = image_path.filename().string();
+        if (modules.contains(image_name))
+            throw std::runtime_error("module already loaded");
+
         hy::nt::hnd sect;
         hy::blk sect_blk{ nullptr, 0 };
 
@@ -58,7 +62,6 @@ namespace xcompat {
         std::cout << "Mapped PE: " << section.block.base.u << "\n";
 
         // load extern pe
-        auto image_name = image_path.filename().string();
         hy::procstm image_stm(proc, section.block);
         hy::mod image(image_name, image_stm, hy::mod_state::mapped);
 
@@ -75,6 +78,11 @@ namespace xcompat {
             std::cout << "import: " << import.name.value_or("ordinal") << " from " << import.module << "\n";
         }
 
-        return section;
+        // add to registry
+        const auto [pair, success] = modules.emplace(image_name, module{ std::move(section), std::move(image) });
+        if (!success)
+            throw std::runtime_error("failed to add to registry");
+
+        return pair->second;
     }
 }

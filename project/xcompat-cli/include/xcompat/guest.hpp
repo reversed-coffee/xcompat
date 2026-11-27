@@ -21,10 +21,10 @@ namespace xcompat {
 
     public:
         hy::proc proc;
-        std::unordered_map<std::string, std::unique_ptr<module>> modules;
+        std::unordered_map<std::string, module> modules;
 
         explicit guest() : proc(std::move(create_process())) {}
 
-        [[nodiscard]] section load_image(const std::filesystem::path& image_path);
+        [[nodiscard]] module& load_image(const std::filesystem::path& image_path);
     };
 }
