@@ -8,19 +8,21 @@ xcompat uses native x86-64 execution and Windows NT facilities instead of CPU em
 
 ## Current state
 
-Development currently has two working foundations: the native PE loader and the shared user-mode kernel MMU.
+Development currently has three working foundations: the native PE execution spine, the shared user-mode kernel MMU, and the `xmem.dll` memory surface.
 
 ### Native loader
 
 The loader currently:
 
-- Creates an isolated native guest process with `NtCreateProcessEx`.
+- Creates an isolated native guest with synchronized process reflection.
 - Maps PE32+ images through NT image sections.
 - Applies base relocations when an image cannot use its preferred address.
-- Resolves Windows API-set contracts and recursively discovers available dependencies.
-- Enumerates and reports unresolved Scarlett-specific imports.
+- Stages normal imports, delay imports, and export-forwarder dependencies before reflection.
+- Resolves Windows API-set contracts and binds named, ordinal, forwarded, normal, and delay imports.
+- Installs process metadata, x64 unwind tables, static TLS, DLL entry points, and thread notifications.
+- Executes controlled PE32+ titles and returns their process exit code.
 
-It does not bind all imported symbols, initialize the guest runtime, or start a title's initial thread. The known Scarlett runtime surface is tracked in the [first-glance implementation checklist](./docs/notes/01-first-glance.md).
+The controlled fixture path reaches `xmem.dll` and `xcptkrn.dll`; Scarlett title-specific process, graphics, storage, audio, and input behavior remains unimplemented. The known Scarlett runtime surface is tracked in the [first-glance implementation checklist](./docs/notes/01-first-glance.md).
 
 ### Shared kernel MMU
 
@@ -87,7 +89,7 @@ cmake --build build/x64-Release
 
 Debug uses the `x86_64-Debug` configure preset.
 
-The incomplete `xcompat::krn::initialize()` currently triggers MSVC `C4716` because it does not return a value. Until kernel initialization is implemented, MSVC builds can suppress that diagnostic for MMU test and benchmark work by setting `CL=/wd4716` in the build environment. The kernel target also emits `C4273` for inconsistent DLL linkage; both are known production build defects rather than MMU test failures.
+`xcptkrn.dll` and `xmem.dll` use their real DLL CRT process-attach path when manually mapped. The obsolete unfinished `xcompat::krn::initialize()` entry point has been removed.
 
 ## Testing
 
@@ -107,6 +109,14 @@ cmake --build build/x64-Release --target xcompat-xmem-tests
 ctest --test-dir build/x64-Release -L xmem --output-on-failure
 ```
 
+The `loader` label covers PE validation, guest phase contracts, exact IAT protection restoration, named/ordinal/forwarded/delay binding, unresolved-symbol categories, and import cycles. The `guest` label executes controlled entry, constructor, TLS, exception, secondary-thread, stack, `xmem.dll`, and kernel-MMU milestones plus the real CLI:
+
+```console
+cmake --build build/x64-Release --target xcompat-cli xcompat-guest-tests
+ctest --test-dir build/x64-Release -L loader --output-on-failure
+ctest --test-dir build/x64-Release -L guest --output-on-failure
+```
+
 ## Benchmarking
 
 Build and run the synthetic MMU benchmark:
@@ -122,10 +132,9 @@ The first measured Release baseline reached approximately 469,000 physical page 
 
 ## Known gaps
 
-- Guest thread bootstrap and execution.
-- End-to-end import symbol binding.
 - Scarlett process, object, scheduling, storage, graphics, audio, and input services.
-- Stable exported kernel initialization and runtime ABI.
+- Title-derived Scarlett ABI contracts beyond the controlled runtime fixtures.
+- Stable broader kernel runtime ABI beyond the MMU surface.
 
 ## Development notes
 

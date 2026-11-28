@@ -4,32 +4,29 @@
 #include <hydra/procstm.hpp>
 
 #include <array>
+#include <cctype>
 #include <cwctype>
-#include <unordered_set>
-
-namespace {
-    std::unordered_set<std::filesystem::path> supplemental_import_directories{};
-}
+#include <utility>
 
 namespace xcompat::loader {
-    void add_supplemental_import_path(const std::filesystem::path& path) {
-        supplemental_import_directories.insert(path);
-    }
-
-    void del_supplemental_import_path(const std::filesystem::path& path) {
-        supplemental_import_directories.erase(path);
+    std::string module_key(const std::string_view module_name) {
+        auto key = std::filesystem::path(module_name).filename().string();
+        if (!std::filesystem::path(key).has_extension()) key += ".dll";
+        std::ranges::transform(key, key.begin(), [](const unsigned char value) {
+            return static_cast<char>(std::tolower(value));
+        });
+        return key;
     }
 
     std::filesystem::path resolve_literal_import(
         std::string_view module_name,
-        const std::filesystem::path& root
+        const std::filesystem::path& root,
+        const std::vector<std::filesystem::path>& supplemental_paths
     ) {
         if (module_name.empty())
             return {};
 
-        std::filesystem::path name(module_name);
-        if (!name.has_extension())
-            name += ".dll";
+        const std::filesystem::path name(module_key(module_name));
 
         if (name.is_absolute())
             return std::filesystem::is_regular_file(name)
@@ -40,11 +37,11 @@ namespace xcompat::loader {
             return std::filesystem::canonical(path);
 
         static const auto directories = [] {
-            char system_dir[MAX_PATH]{};
-            char windows_dir[MAX_PATH]{};
+            wchar_t system_dir[MAX_PATH]{};
+            wchar_t windows_dir[MAX_PATH]{};
 
-            GetSystemDirectoryA(system_dir, MAX_PATH);
-            GetWindowsDirectoryA(windows_dir, MAX_PATH);
+            GetSystemDirectoryW(system_dir, MAX_PATH);
+            GetWindowsDirectoryW(windows_dir, MAX_PATH);
 
             return std::array{
                 std::filesystem::path(system_dir),
@@ -61,7 +58,7 @@ namespace xcompat::loader {
                 return std::filesystem::canonical(path);
         }
 
-        for (const auto& dir : supplemental_import_directories) {
+        for (const auto& dir : supplemental_paths) {
             if (dir.empty())
                 continue;
 
@@ -175,8 +172,8 @@ namespace xcompat::loader {
         hy::nt::hnd sec_hnd;
         hy::blk sec_blk{ nullptr, 0 };
 
-        const hy::nt::hnd file(CreateFileA(
-            path.string().c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+        const hy::nt::hnd file(CreateFileW(
+            path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
             FILE_ATTRIBUTE_NORMAL, nullptr
         ));
 
@@ -202,27 +199,43 @@ namespace xcompat::loader {
 
         if (map_status == STATUS_IMAGE_NOT_AT_BASE) {
             const auto writer = [&](hy::ptr base, const void* data, std::size_t size) {
-                const auto protection = proc.mm_protect(
-                    base, size, hy::mem_mode::read | hy::mem_mode::write
-                );
-
-                hy::nt::error::assert(hy::nt::last_status, "failed to unprotect relocation target");
-
-                const auto written = proc.mm_write(base, data, size);
-
-                proc.mm_protect(base, size, protection);
-                hy::nt::error::assert(hy::nt::last_status, "failed to restore protection");
-
-                return written == size;
+                return write_remote(proc, base, {
+                    static_cast<const std::byte*>(data), size
+                });
             };
 
             if (img_mod.reloc(img_mod.base, writer) != hy::STA_SUCCESS)
-                throw std::runtime_error("relocation failed");
+                throw std::runtime_error(path.string() + ": relocation failed");
         }
         else {
             hy::nt::error::assert(map_status, "failed to map image in guest process");
         }
 
         return img_mod;
+    }
+
+    bool write_remote(
+        hy::proc& proc,
+        const hy::ptr address,
+        const std::span<const std::byte> bytes
+    ) {
+        if (bytes.empty()) return true;
+
+        PVOID protected_base = address.u;
+        SIZE_T protected_size = bytes.size();
+        ULONG old_protection{};
+        const auto status = NtProtectVirtualMemory(
+            proc, &protected_base, &protected_size, PAGE_READWRITE, &old_protection);
+        if (!NT_SUCCESS(status)) return false;
+
+        const auto restore = [&] {
+            ULONG ignored{};
+            return NtProtectVirtualMemory(
+                proc, &protected_base, &protected_size, old_protection, &ignored);
+        };
+
+        const auto written = proc.mm_write(address, bytes.data(), bytes.size());
+        const auto restore_status = restore();
+        return written == bytes.size() && NT_SUCCESS(restore_status);
     }
 }

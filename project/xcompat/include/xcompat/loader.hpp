@@ -2,15 +2,19 @@
 
 #include <hydra/proc.hpp>
 
+#include <cstddef>
 #include <filesystem>
+#include <span>
+#include <string>
+#include <vector>
 
 namespace xcompat::loader {
-    void add_supplemental_import_path(const std::filesystem::path& path);
-    void del_supplemental_import_path(const std::filesystem::path& path);
+    [[nodiscard]] std::string module_key(std::string_view module_name);
 
     std::filesystem::path resolve_literal_import(
         std::string_view module_name,
-        const std::filesystem::path& root
+        const std::filesystem::path& root,
+        const std::vector<std::filesystem::path>& supplemental_paths
     );
 
     inline bool is_api_set(const std::string_view name) {
@@ -27,5 +31,11 @@ namespace xcompat::loader {
     hy::mod map_img_file_to_proc(
         hy::proc& proc,
         const std::filesystem::path& path
+    );
+
+    bool write_remote(
+        hy::proc& proc,
+        hy::ptr address,
+        std::span<const std::byte> bytes
     );
 }

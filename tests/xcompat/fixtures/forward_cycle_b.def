@@ -1,0 +1,3 @@
+LIBRARY forward_cycle_b
+EXPORTS
+    Cycle=forward_cycle_a.Cycle @1

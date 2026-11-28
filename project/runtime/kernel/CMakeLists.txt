@@ -9,6 +9,7 @@ add_library(xcompat-kernel SHARED ${XCOMPAT_SOURCES})
 set_target_properties(xcompat-kernel
     PROPERTIES
         OUTPUT_NAME "xcptkrn"
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
         CXX_STANDARD 23
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO
