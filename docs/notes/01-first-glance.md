@@ -26,7 +26,7 @@ All functions use the Windows x64 ABI (`WINAPI` / `extern "system"`). C++ defaul
 
 The core invariant is that 64 KiB physical pages are separate objects from virtual reservations. A reservation made mappable by `XMemVirtualAlloc` must survive map/unmap operations, and one physical page may be mapped at more than one virtual address. A pagefile-backed section plus Windows placeholders is the closest host model; host AWE is unsuitable because it normally requires `SeLockMemoryPrivilege`.
 
-### [ ] `XMemAlloc`
+### [x] `XMemAlloc`
 
 ```cpp
 PVOID WINAPI XMemAlloc(SIZE_T Size, ULONGLONG Attributes);
@@ -34,7 +34,7 @@ PVOID WINAPI XMemAlloc(SIZE_T Size, ULONGLONG Attributes);
 
 Allocates ordinary or physical/cache-class memory according to `XALLOC_ATTRIBUTES`, including allocator ID, alignment, zero-initialization, and address constraints. It uses the active title allocation hook; `XMemAllocDefault` bypasses that hook. Return `NULL` on failure and preserve enough metadata for the matching free. **Documented/corroborated.**
 
-### [ ] `XMemAllocDefault`
+### [x] `XMemAllocDefault`
 
 ```cpp
 PVOID WINAPI XMemAllocDefault(SIZE_T Size, ULONGLONG Attributes);
@@ -42,7 +42,7 @@ PVOID WINAPI XMemAllocDefault(SIZE_T Size, ULONGLONG Attributes);
 
 Default allocator used when no title hook is installed, and callable directly by a hook. It must honor the same observable alignment and attribute contract as `XMemAlloc`. **Documented/corroborated.**
 
-### [ ] `XMemAllocatePhysicalPages`
+### [x] `XMemAllocatePhysicalPages`
 
 ```cpp
 BOOL WINAPI XMemAllocatePhysicalPages(
@@ -53,7 +53,7 @@ BOOL WINAPI XMemAllocatePhysicalPages(
 
 `NumberOfPages` is in/out: requested 64 KiB pages on entry, allocated count on return. Fill `PageArray` with opaque page-frame numbers; support the title's observed flags `0x180`, `0x280`, and `0x380`. Allocation may be partial only if the returned count and failure status agree. **Documented/corroborated.**
 
-### [ ] `XMemFree`
+### [x] `XMemFree`
 
 ```cpp
 VOID WINAPI XMemFree(PVOID Address, ULONGLONG Attributes);
@@ -61,7 +61,7 @@ VOID WINAPI XMemFree(PVOID Address, ULONGLONG Attributes);
 
 Releases an `XMemAlloc` allocation through the active free hook. Validate allocator ownership in debug builds; production behavior must not silently free foreign memory. **Documented/corroborated.**
 
-### [ ] `XMemFreeDefault`
+### [x] `XMemFreeDefault`
 
 ```cpp
 VOID WINAPI XMemFreeDefault(PVOID Address, ULONGLONG Attributes);
@@ -69,7 +69,7 @@ VOID WINAPI XMemFreeDefault(PVOID Address, ULONGLONG Attributes);
 
 Releases memory returned by `XMemAllocDefault` without invoking title hooks. **Documented.**
 
-### [ ] `XMemFreePhysicalPages`
+### [x] `XMemFreePhysicalPages`
 
 ```cpp
 BOOL WINAPI XMemFreePhysicalPages(
@@ -79,7 +79,7 @@ BOOL WINAPI XMemFreePhysicalPages(
 
 Returns page objects to the physical pool. Existing mapped views remain valid until explicitly unmapped; the page numbers must stop being accepted for new mappings. **Documented/corroborated.**
 
-### [ ] `XMemGetWorkingSetStatistics`
+### [x] `XMemGetWorkingSetStatistics`
 
 ```cpp
 BOOL WINAPI XMemGetWorkingSetStatistics(
@@ -89,7 +89,7 @@ BOOL WINAPI XMemGetWorkingSetStatistics(
 
 Reports title/tools/stack/kernel-pool usage selected by flags. Populate every field represented by the requested structure version; title limits must reflect memory transferred away by `XMemTransferMemory`. **Documented.**
 
-### [ ] `XMemIsToolsMemAvailable`
+### [x] `XMemIsToolsMemAvailable`
 
 ```cpp
 BOOL WINAPI XMemIsToolsMemAvailable(void);
@@ -97,7 +97,7 @@ BOOL WINAPI XMemIsToolsMemAvailable(void);
 
 Returns whether profiling/tools memory exists. A retail-compatible process should return `FALSE` unless a tools partition is deliberately configured. **Documented.**
 
-### [ ] `XMemMapPhysicalPages`
+### [x] `XMemMapPhysicalPages`
 
 ```cpp
 PVOID WINAPI XMemMapPhysicalPages(
@@ -108,7 +108,7 @@ PVOID WINAPI XMemMapPhysicalPages(
 
 Replaces the selected part of a mappable reservation with views of the listed pages and returns `VirtualAddress`. `PageArray == NULL` unmaps while preserving the reservation. Mapping failure returns `NULL`; remapping an occupied range first removes the old views. **Documented/corroborated.**
 
-### [ ] `XMemMapPhysicalPagesScatter`
+### [x] `XMemMapPhysicalPagesScatter`
 
 ```cpp
 BOOL WINAPI XMemMapPhysicalPagesScatter(
@@ -119,7 +119,7 @@ BOOL WINAPI XMemMapPhysicalPagesScatter(
 
 Maps one 64 KiB page at each address. A null `PageArray`, or a zero entry, unmaps the corresponding address while preserving its reservation. The operation must handle the title's observed large batches rather than looping through a path with quadratic view lookup. **Documented/corroborated.**
 
-### [ ] `XMemTransferMemory`
+### [x] `XMemTransferMemory`
 
 ```cpp
 BOOL WINAPI XMemTransferMemory(UINT32 Direction, SIZE_T Size);
@@ -127,7 +127,7 @@ BOOL WINAPI XMemTransferMemory(UINT32 Direction, SIZE_T Size);
 
 Moves budget between title, system, and tools partitions; it does not copy bytes. Round or reject sizes according to the console's 2 MiB transfer granularity and update subsequent working-set limits atomically. The title has an observed `Direction = 1`, `Size = 0x1000000` call. The enum type name is **provisional**; width/order and behavior are corroborated.
 
-### [ ] `XMemVirtualAlloc`
+### [x] `XMemVirtualAlloc`
 
 ```cpp
 PVOID WINAPI XMemVirtualAlloc(

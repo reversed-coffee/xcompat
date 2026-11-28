@@ -8,8 +8,28 @@
 #   define XMEM_API __declspec(dllexport)
 #endif
 
-typedef struct _XMEM_WORKING_SET_STATISTICS  
-XMEM_WORKING_SET_STATISTICS, *PXMEM_WORKING_SET_STATISTICS;
+#ifndef MEM_64K_PAGES
+#   define MEM_64K_PAGES 0x20400000
+#endif
+
+#ifndef MEM_2MB_PAGES
+#   define MEM_2MB_PAGES 0x20000000
+#endif
+
+typedef struct _XMEM_WORKING_SET_STATISTICS {
+    SIZE_T TitleLimit;
+    SIZE_T TitleUsed;
+    SIZE_T ToolsLimit;
+    SIZE_T ToolsUsed;
+    ULONG StackUsed;
+    ULONG PhysicalPages;
+    SIZE_T GpuOptimalLimit;
+    SIZE_T GpuOptimalUsed;
+    SIZE_T ToolsGpuOptimalLimit;
+    SIZE_T ToolsGpuOptimalUsed;
+    ULONG KernelPoolUsed;
+    ULONG KernelPoolLimit;
+} XMEM_WORKING_SET_STATISTICS, *PXMEM_WORKING_SET_STATISTICS;
 
 #ifdef __cplusplus
 extern "C" {

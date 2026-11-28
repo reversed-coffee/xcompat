@@ -1,5 +1,3 @@
-set_target_properties(xcompat-kernel PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-
 add_executable(xcompat-kernel-mmu-tests
     mmu_tests.cpp
 )

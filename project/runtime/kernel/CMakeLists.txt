@@ -18,7 +18,7 @@ target_compile_definitions(xcompat-kernel
     PRIVATE
         NOMINMAX
         WIN32_LEAN_AND_MEAN
-        XMEM_LIBRARY
+        XCOMPAT_KRN
 )
 
 target_include_directories(xcompat-kernel

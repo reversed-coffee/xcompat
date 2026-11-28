@@ -1,6 +1,7 @@
 #pragma once
 
-#include <iostream>
+#include "xcptkrn/krn.hpp"
+
 #include <vector>
 
 #include <hydra/ost.hpp>
@@ -27,12 +28,12 @@ namespace xcompat::krn::mmu {
         bool split{};
     };
 
-    hy::ptr reserve(hy::ptr base, std::size_t size);
-    bool release(hy::ptr base);
+    KRN_API hy::ptr reserve(hy::ptr base, std::size_t size);
+    KRN_API bool release(hy::ptr base);
 
-    bool alloc_phy(std::size_t& count, pfn_t* pages);
-    bool free_phy(std::size_t count, const pfn_t* pages);
+    KRN_API bool alloc_phy(std::size_t& count, pfn_t* pages);
+    KRN_API bool free_phy(std::size_t count, const pfn_t* pages);
 
-    bool map(hy::ptr base, pfn_t pfn);
-    bool unmap(hy::ptr base);
+    KRN_API bool map(hy::ptr base, pfn_t pfn);
+    KRN_API bool unmap(hy::ptr base);
 }

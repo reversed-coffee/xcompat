@@ -35,7 +35,7 @@ It does not bind all imported symbols, initialize the guest runtime, or start a 
 
 The MMU has 17 regression tests and 6 deterministic stress tests registered through CTest. A synthetic Release benchmark covers allocation, reservation, mapping, aliasing, complete lifecycles, sparse mappings, and concurrent scaling. See the [first MMU benchmark report](./docs/notes/03-first-mmu-benchmark.md).
 
-The public `xmem.dll` entry points are still stubs and are not connected to the MMU. Kernel initialization, scheduling, and object-management layers are also incomplete.
+`xmem.dll` now routes 64 KiB physical-page allocation, reservation, mapping, aliasing, persistence, and release through the shared kernel MMU. Its default allocator honors encoded alignment, title allocation hooks are used when present, ordinary virtual allocations use the host VM, and retail tools-memory and host-backed working-set behavior are exposed through the public API. Kernel initialization, scheduling, and object-management layers remain incomplete.
 
 ## Architecture
 
@@ -63,8 +63,9 @@ operating system, runtime, and hardware interface levels.
 - `project/xcompat/` — native loader library.
 - `project/xcompat-cli/` — command-line loader prototype.
 - `project/runtime/kernel/` — shared user-mode kernel and MMU (`xcptkrn.dll`).
-- `project/runtime/xmem/` — Scarlett memory API surface (`xmem.dll`), currently stubbed.
+- `project/runtime/xmem/` — Scarlett memory API surface backed by the shared MMU (`xmem.dll`).
 - `tests/runtime/kernel/` — native MMU regression tests, stress tests, and benchmark.
+- `tests/runtime/xmem/` — public xmem API regression tests.
 - `docs/` — implementation notes, benchmark results, and development logs.
 
 ## Building
@@ -99,6 +100,13 @@ ctest --test-dir build/x64-Release -L mmu --output-on-failure
 
 CTest labels separate the 17 ordinary regression cases (`regression`) from the 6 deterministic stress cases (`stress`). The suite exercises physical-page lifetime, reservation rounding, real mapped-memory access, aliasing and persistence, placeholder subdivision and release, failure contracts, concurrency, large batches, repeated lifecycles, and sparse mappings.
 
+The `xmem` label contains five public-API regression cases covering aligned allocations, contiguous and scatter physical mappings, aliases and remapping, virtual allocations, working-set budget transfer, and invalid parameters:
+
+```console
+cmake --build build/x64-Release --target xcompat-xmem-tests
+ctest --test-dir build/x64-Release -L xmem --output-on-failure
+```
+
 ## Benchmarking
 
 Build and run the synthetic MMU benchmark:
@@ -116,7 +124,6 @@ The first measured Release baseline reached approximately 469,000 physical page 
 
 - Guest thread bootstrap and execution.
 - End-to-end import symbol binding.
-- Integration of `xmem.dll` with the kernel MMU.
 - Scarlett process, object, scheduling, storage, graphics, audio, and input services.
 - Stable exported kernel initialization and runtime ABI.
 

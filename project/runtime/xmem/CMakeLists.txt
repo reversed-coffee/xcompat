@@ -28,5 +28,6 @@ target_include_directories(xcompat-xmem
 )
 
 target_link_libraries(xcompat-xmem
-    xcompat-kernel
+    PRIVATE
+        xcompat-kernel
 )
