@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 4.0)
 
 project(xcompat LANGUAGES C CXX)
 
+include(CTest)
+
 if(NOT WIN32)
     message(FATAL_ERROR "The xcompat project currently only compiles for Windows.")
 endif()
@@ -18,3 +20,7 @@ set(XCOMPAT_RUNTIME_DIRECTORY "${CMAKE_BINARY_DIR}/runtime")
 
 add_subdirectory(dependencies)
 add_subdirectory(project)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
