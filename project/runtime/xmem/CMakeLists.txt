@@ -27,4 +27,6 @@ target_include_directories(xcompat-xmem
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(xcompat-xmem)
+target_link_libraries(xcompat-xmem
+    xcompat-kernel
+)
