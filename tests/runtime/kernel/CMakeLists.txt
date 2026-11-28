@@ -23,6 +23,29 @@ target_link_libraries(xcompat-kernel-mmu-tests
         xcompat-kernel
 )
 
+add_executable(xcompat-kernel-mmu-benchmark
+    mmu_benchmark.cpp
+)
+
+set_target_properties(xcompat-kernel-mmu-benchmark
+    PROPERTIES
+        CXX_STANDARD 23
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        RUNTIME_OUTPUT_DIRECTORY "${XCOMPAT_RUNTIME_DIRECTORY}"
+)
+
+target_compile_definitions(xcompat-kernel-mmu-benchmark
+    PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+)
+
+target_link_libraries(xcompat-kernel-mmu-benchmark
+    PRIVATE
+        xcompat-kernel
+)
+
 function(add_mmu_test name label)
     add_test(
         NAME "runtime.kernel.mmu.${name}"
