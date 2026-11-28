@@ -4,6 +4,7 @@
 
 #include "xcompat/log.hpp"
 #include "xcompat/guest.hpp"
+#include "xcompat/loader.hpp"
 
 static int usage() {
     std::cerr << "usage: xcompat <exe_path> <args...>\n";
@@ -12,8 +13,11 @@ static int usage() {
 
 static void init() {
     SetConsoleTitleA("xcompat");
+
     xcompat::log::init();
     xcompat::log::set_level(xcompat::log::level::debug);
+
+    xcompat::loader::add_supplemental_import_path("runtime");
 }
 
 static int spawn_guest(const std::filesystem::path& canon_path, std::vector<std::string> args) {

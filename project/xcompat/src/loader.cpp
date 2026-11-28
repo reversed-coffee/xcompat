@@ -5,8 +5,21 @@
 
 #include <array>
 #include <cwctype>
+#include <unordered_set>
+
+namespace {
+    std::unordered_set<std::filesystem::path> supplemental_import_directories{};
+}
 
 namespace xcompat::loader {
+    void add_supplemental_import_path(const std::filesystem::path& path) {
+        supplemental_import_directories.insert(path);
+    }
+
+    void del_supplemental_import_path(const std::filesystem::path& path) {
+        supplemental_import_directories.erase(path);
+    }
+
     std::filesystem::path resolve_literal_import(
         std::string_view module_name,
         const std::filesystem::path& root
@@ -40,6 +53,15 @@ namespace xcompat::loader {
         }();
 
         for (const auto& dir : directories) {
+            if (dir.empty())
+                continue;
+
+            const auto path = dir / name;
+            if (std::filesystem::is_regular_file(path))
+                return std::filesystem::canonical(path);
+        }
+
+        for (const auto& dir : supplemental_import_directories) {
             if (dir.empty())
                 continue;
 

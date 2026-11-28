@@ -5,6 +5,9 @@
 #include <filesystem>
 
 namespace xcompat::loader {
+    void add_supplemental_import_path(const std::filesystem::path& path);
+    void del_supplemental_import_path(const std::filesystem::path& path);
+
     std::filesystem::path resolve_literal_import(
         std::string_view module_name,
         const std::filesystem::path& root
