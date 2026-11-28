@@ -436,16 +436,27 @@ namespace {
 
 int main(const int argc, const char* const* argv) {
     benchmark_settings settings{"full", 0.150, 7};
-    if (argc == 2 && std::string_view(argv[1]) == "--quick")
-        settings = {"quick", 0.020, 3};
-    else if (argc != 1) {
-        std::cerr << "usage: xcompat-kernel-mmu-benchmark [--quick]\n";
-        return 2;
+    bool reservations_only{};
+
+    for (int argument = 1; argument < argc; ++argument) {
+        const std::string_view option = argv[argument];
+        if (option == "--quick")
+            settings = {"quick", 0.020, 3};
+        else if (option == "--reservations")
+            reservations_only = true;
+        else {
+            std::cerr << "usage: xcompat-kernel-mmu-benchmark "
+                         "[--quick] [--reservations]\n";
+            return 2;
+        }
     }
 
     std::cout << "benchmark,mode,threads,batch_pages,reservation_pages,iterations,"
                  "operations_per_iteration,median_seconds,ns_per_operation,"
                  "operations_per_second\n";
+
+    if (reservations_only)
+        return measure_reservation_cycles(settings) ? 0 : 1;
 
     if (!measure_physical_cycles(settings)
         || !measure_reservation_cycles(settings)
