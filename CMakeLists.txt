@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 4.0)
-cmake_policy(SET CMP0184 NEW)
 
 project(xcompat LANGUAGES C CXX)
 

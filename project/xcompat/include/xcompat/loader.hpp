@@ -14,7 +14,7 @@ namespace xcompat::loader {
     std::filesystem::path resolve_literal_import(
         std::string_view module_name,
         const std::filesystem::path& root,
-        const std::vector<std::filesystem::path>& supplemental_paths
+        std::span<const std::filesystem::path> supplemental_paths
     );
 
     inline bool is_api_set(const std::string_view name) {

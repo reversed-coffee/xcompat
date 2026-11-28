@@ -8,7 +8,7 @@ xcompat uses native x86-64 execution and Windows NT facilities instead of CPU em
 
 ## Current state
 
-Development currently has three working foundations: the native PE execution spine, the shared user-mode kernel MMU, and the `xmem.dll` memory surface.
+Development currently has three working foundations: a controlled native PE execution slice, the shared user-mode kernel MMU, and the directly tested `xmem.dll` memory surface.
 
 ### Native loader
 
@@ -17,12 +17,11 @@ The loader currently:
 - Creates an isolated native guest with synchronized process reflection.
 - Maps PE32+ images through NT image sections.
 - Applies base relocations when an image cannot use its preferred address.
-- Stages normal imports, delay imports, and export-forwarder dependencies before reflection.
-- Resolves Windows API-set contracts and binds named, ordinal, forwarded, normal, and delay imports.
-- Installs process metadata, x64 unwind tables, static TLS, DLL entry points, and thread notifications.
-- Executes controlled PE32+ titles and returns their process exit code.
+- Discovers normal imports, delay imports, and export-forwarder dependencies without loading native modules during discovery.
+- Resolves Windows API-set contracts and eagerly binds named, ordinal, forwarded, normal, and delay imports.
+- Executes controlled dependency-free no-CRT PE32+ roots and returns their process exit code.
 
-The controlled fixture path reaches `xmem.dll` and `xcptkrn.dll`; Scarlett title-specific process, graphics, storage, audio, and input behavior remains unimplemented. The known Scarlett runtime surface is tracked in the [first-glance implementation checklist](./docs/notes/01-first-glance.md).
+Process reflection preserves the controller's loader-list snapshot even though the guest PEB image base and process parameters identify the mapped root. Manually mapped DLL startup, CRT startup, static TLS, unwind registration, secondary-thread notifications, dynamic module lookup, and guest execution through `xmem.dll` or `xcptkrn.dll` are unsupported. The known Scarlett runtime surface is tracked in the [first-glance implementation checklist](./docs/notes/01-first-glance.md).
 
 ### Shared kernel MMU
 
@@ -89,7 +88,7 @@ cmake --build build/x64-Release
 
 Debug uses the `x86_64-Debug` configure preset.
 
-`xcptkrn.dll` and `xmem.dll` use their real DLL CRT process-attach path when manually mapped. The obsolete unfinished `xcompat::krn::initialize()` entry point has been removed.
+The incomplete `xcompat::krn::initialize()` currently triggers MSVC `C4716` because it does not return a value. Until kernel initialization is implemented, MSVC builds can suppress that diagnostic for MMU test and benchmark work by setting `CL=/wd4716` in the build environment. The kernel target also emits `C4273` for inconsistent DLL linkage; both are known production build defects rather than MMU test failures.
 
 ## Testing
 
@@ -109,7 +108,7 @@ cmake --build build/x64-Release --target xcompat-xmem-tests
 ctest --test-dir build/x64-Release -L xmem --output-on-failure
 ```
 
-The `loader` label covers PE validation, guest phase contracts, exact IAT protection restoration, named/ordinal/forwarded/delay binding, unresolved-symbol categories, and import cycles. The `guest` label executes controlled entry, constructor, TLS, exception, secondary-thread, stack, `xmem.dll`, and kernel-MMU milestones plus the real CLI:
+The `loader` label covers literal path resolution, lifecycle contracts, exact IAT protection restoration, named/ordinal/forwarded/delay binding, exact unresolved diagnostics, and untouched failing IAT slots. The `guest` label covers controlled no-CRT root entry, stack sizing, process-parameter handoff, initialization failure cleanup, and the real CLI:
 
 ```console
 cmake --build build/x64-Release --target xcompat-cli xcompat-guest-tests
@@ -132,8 +131,10 @@ The first measured Release baseline reached approximately 469,000 physical page 
 
 ## Known gaps
 
+- Coherent guest loader lists and native process-image identity.
+- Manually mapped DLL initialization, CRT startup, static TLS, unwind registration, secondary-thread notifications, and dynamic lookup.
+- Guest execution through `xmem.dll` and `xcptkrn.dll`; their current behavior is established only by direct native suites.
 - Scarlett process, object, scheduling, storage, graphics, audio, and input services.
-- Title-derived Scarlett ABI contracts beyond the controlled runtime fixtures.
 - Stable broader kernel runtime ABI beyond the MMU surface.
 
 ## Development notes

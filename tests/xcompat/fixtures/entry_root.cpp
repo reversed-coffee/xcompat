@@ -41,5 +41,7 @@ extern "C" DWORD WINAPI entry(PPEB peb) {
     if (!peb->ProcessParameters->CurrentDirectory.DosPath.Length) return 16;
     if (!environment_has(static_cast<const wchar_t*>(peb->ProcessParameters->Environment),
                          L"XCOMPAT_GUEST_TEST=present")) return 17;
+    if (contains(peb->ProcessParameters->CommandLine, L"after-empty") &&
+        !contains(peb->ProcessParameters->CommandLine, L" \"\" after-empty")) return 18;
     return 0;
 }

@@ -1,9 +1,0 @@
-EXPORTS
-    ConstructorReady
-    TlsGet
-    TlsSet
-    ExceptionReady
-    ReservedReady
-    SehReady
-    ThreadAttachCount
-    UnwindReady

@@ -50,7 +50,7 @@ static int spawn_guest(const std::filesystem::path& path, std::vector<std::wstri
 
     auto& title = guest.load_image(path);
     xcompat::log::info("Guest PID: 0x{:X}", GetProcessId(guest.process()));
-    xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.base().i, title.size());
+    xcompat::log::info("Title module: 0x{:08X} (size: 0x{:X})", title.base.i, title.size);
 
     const auto report = guest.link();
     if (!report.complete()) {
@@ -64,7 +64,6 @@ static int spawn_guest(const std::filesystem::path& path, std::vector<std::wstri
         return 1;
     }
 
-    guest.initialize();
     return static_cast<int>(guest.run());
 }
 

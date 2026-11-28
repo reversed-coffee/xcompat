@@ -1,4 +1,0 @@
-LIBRARY forward
-EXPORTS
-    ForwardNamed=provider.NamedValue @1
-    ForwardOrdinal=provider.#2 @2

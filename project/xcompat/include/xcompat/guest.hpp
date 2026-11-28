@@ -12,6 +12,11 @@
 #include <vector>
 
 namespace xcompat {
+    namespace detail {
+        class linker;
+        class guest_process;
+    }
+
     enum class import_kind { normal, delay };
 
     enum class link_error {
@@ -44,8 +49,14 @@ namespace xcompat {
     };
 
     class guest {
-        struct impl;
-        std::unique_ptr<impl> impl_;
+        enum class state { empty, loaded, linked, exited, failed };
+
+        guest_options options_;
+        std::vector<module> modules_;
+        std::unique_ptr<detail::linker> linker_;
+        std::unique_ptr<detail::guest_process> process_;
+        state state_{state::empty};
+        bool link_attempted_{};
 
     public:
         explicit guest(guest_options options = {});
@@ -58,7 +69,6 @@ namespace xcompat {
 
         module& load_image(const std::filesystem::path& image_path);
         link_report link();
-        void initialize();
         DWORD run();
 
         hy::proc& process();

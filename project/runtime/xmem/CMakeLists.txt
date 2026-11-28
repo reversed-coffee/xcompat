@@ -9,7 +9,6 @@ add_library(xcompat-xmem SHARED ${XCOMPAT_SOURCES})
 set_target_properties(xcompat-xmem
     PROPERTIES
         OUTPUT_NAME "xmem"
-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
         CXX_STANDARD 23
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO

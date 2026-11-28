@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cctype>
+#include <cstdint>
 #include <cwctype>
 #include <utility>
 
@@ -21,17 +22,20 @@ namespace xcompat::loader {
     std::filesystem::path resolve_literal_import(
         std::string_view module_name,
         const std::filesystem::path& root,
-        const std::vector<std::filesystem::path>& supplemental_paths
+        const std::span<const std::filesystem::path> supplemental_paths
     ) {
         if (module_name.empty())
             return {};
 
-        const std::filesystem::path name(module_key(module_name));
-
-        if (name.is_absolute())
-            return std::filesystem::is_regular_file(name)
-                ? std::filesystem::canonical(name)
+        std::filesystem::path requested(module_name);
+        const auto absolute = requested.is_absolute();
+        if (!requested.has_extension()) requested += ".dll";
+        if (absolute)
+            return std::filesystem::is_regular_file(requested)
+                ? std::filesystem::canonical(requested)
                 : std::filesystem::path{};
+
+        const auto& name = requested;
 
         if (const auto path = root / name; std::filesystem::is_regular_file(path))
             return std::filesystem::canonical(path);
@@ -221,21 +225,47 @@ namespace xcompat::loader {
     ) {
         if (bytes.empty()) return true;
 
-        PVOID protected_base = address.u;
-        SIZE_T protected_size = bytes.size();
-        ULONG old_protection{};
-        const auto status = NtProtectVirtualMemory(
-            proc, &protected_base, &protected_size, PAGE_READWRITE, &old_protection);
-        if (!NT_SUCCESS(status)) return false;
+        struct protection_guard {
+            HANDLE process;
+            PVOID& base;
+            SIZE_T& size;
+            ULONG protection;
+            NTSTATUS& status;
 
-        const auto restore = [&] {
-            ULONG ignored{};
-            return NtProtectVirtualMemory(
-                proc, &protected_base, &protected_size, old_protection, &ignored);
+            ~protection_guard() {
+                ULONG ignored{};
+                status = NtProtectVirtualMemory(
+                    process, &base, &size, protection, &ignored);
+            }
         };
 
-        const auto written = proc.mm_write(address, bytes.data(), bytes.size());
-        const auto restore_status = restore();
-        return written == bytes.size() && NT_SUCCESS(restore_status);
+        SYSTEM_INFO system_info{};
+        GetSystemInfo(&system_info);
+        const auto page_size = static_cast<std::uintptr_t>(system_info.dwPageSize);
+        std::size_t offset{};
+        while (offset < bytes.size()) {
+            const auto current = address.i + offset;
+            const auto page_remaining = page_size - current % page_size;
+            const auto chunk = std::min<std::size_t>(
+                bytes.size() - offset, page_remaining);
+
+            PVOID protected_base = reinterpret_cast<void*>(current);
+            SIZE_T protected_size = chunk;
+            ULONG old_protection{};
+            const auto status = NtProtectVirtualMemory(
+                proc, &protected_base, &protected_size, PAGE_READWRITE, &old_protection);
+            if (!NT_SUCCESS(status)) return false;
+
+            NTSTATUS restore_status = STATUS_UNSUCCESSFUL;
+            std::size_t written{};
+            {
+                const protection_guard restore{
+                    proc, protected_base, protected_size, old_protection, restore_status };
+                written = proc.mm_write(current, bytes.data() + offset, chunk);
+            }
+            if (written != chunk || !NT_SUCCESS(restore_status)) return false;
+            offset += chunk;
+        }
+        return true;
     }
 }

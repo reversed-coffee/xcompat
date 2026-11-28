@@ -1,3 +1,0 @@
-LIBRARY missing_export_forward
-EXPORTS
-    Missing=leaf.Absent @1
